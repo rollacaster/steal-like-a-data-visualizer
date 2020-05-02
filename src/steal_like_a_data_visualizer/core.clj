@@ -9,7 +9,7 @@
     :settings #(q/smooth 2)
     :middleware [md/pause-on-error md/fun-mode]
     :setup s/setup
-    :draw (fn [state] (s/draw state 0))
+    :draw s/draw
     :update s/update-state
     :display 1
     :features [:no-bind-output]
