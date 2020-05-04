@@ -16,7 +16,8 @@
    :velocity [0 0]
    :location location
    :r 10.0
-   :maxspeed (if (> (q/random 1) 0.5) 1.5 3.0)
+   :maxspeed (if (or (= idx 8.0)
+                     (> (q/random 1) 0.5)) 3.0 1.5)
    :maxforce 0.1})
 
 (def movers
@@ -57,9 +58,17 @@
                            (y (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))]))))))
         state))
 
-(defn draw-mover [{[x y] :location}]
-  (q/fill 255 100)
-  (q/ellipse x y 3 3))
+(defn draw-mover [{[x y] :location
+                   :keys [idx]}]
+  (if (= idx 8.0)
+    (do
+      (q/fill 255)
+      (q/text "Sylvan Esso" x (- y 8))
+      (q/fill 255 0 200)
+      (q/ellipse x y 4 4))
+    (do
+      (q/fill 255 100)
+      (q/ellipse x y 3 3))))
 
 (defn draw [movers]
   (q/background 0)
