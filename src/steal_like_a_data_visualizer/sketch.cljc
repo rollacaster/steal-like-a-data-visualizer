@@ -31,7 +31,8 @@
   (q/text-align :center)
   (q/text-size 12)
   (q/no-stroke)
-  movers)
+  {:movers movers
+   :small-venue-opacity 0.0})
 
 (defn update-vehicle [{:keys [velocity acceleration maxspeed location] :as vehicle}]
   (let [velocity (v/add velocity acceleration)]
@@ -48,16 +49,21 @@
         steer (v/limit (v/sub desired velocity) maxforce)]
     (apply-force vehicle steer)))
 
+(comment
+  (q/with-sketch (q/get-sketch-by-id "sketch")
+    (q/constrain (q/map-range 105 100 120 0 1) 0 1)))
 
-(defn update-state [state]
-  (into [] (comp (map
-               (fn [{[lx ly] :location :keys [idx] :as mover}]
-                 (update-vehicle
-                  (seek mover
-                        (let [phi (q/atan2 ly lx)]
-                          [(x (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))
-                           (y (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))]))))))
-        state))
+(defn update-state [{:keys [movers]} scroll-pos]
+  {:small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
+   :movers
+   (map
+    (fn [{[lx ly] :location :keys [idx] :as mover}]
+      (update-vehicle
+       (seek mover
+             (let [phi (q/atan2 ly lx)]
+               [(x (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))
+                (y (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))]))))
+    movers)})
 
 (defn draw-mover [{[x y] :location
                    :keys [idx]}]
@@ -81,11 +87,11 @@
           nil))
     col))
 
-(defn draw-small-venue []
+(defn draw-small-venue [opacity]
   (let [str "SMALL VENUE"
         total-angle (/ (q/text-width str) r)]
     (q/stroke 0)
-    (q/fill 200)
+    (q/fill 200 opacity)
     (loop [str str
            arc-length 0]
       (let [c (first str)
@@ -101,7 +107,7 @@
         (when (> (count str) 1)
           (recur (drop 1 str)
                  (+ arc-length c-width))))))
-  (q/stroke 200)
+  (q/stroke 200 opacity)
   (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
     (q/begin-shape)
     (doseq [i dash]
@@ -110,10 +116,10 @@
        (y (+ 40 r) i)))
     (q/end-shape)))
 
-(defn draw [movers]
+(defn draw [{:keys [small-venue-opacity movers]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
-  (draw-small-venue)
+  (draw-small-venue small-venue-opacity)
   (doseq [mover movers]
       (draw-mover mover)))
