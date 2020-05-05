@@ -9,7 +9,6 @@
 (def scroll-pos (r/atom 0))
 
 (defn app []
-
   (r/create-class
    {:display-name "App"
     :component-did-mount

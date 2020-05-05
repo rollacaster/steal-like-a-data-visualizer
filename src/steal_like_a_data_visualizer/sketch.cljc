@@ -9,6 +9,8 @@
 (defn x [r phi] (* r (Math/cos phi)))
 (defn y [r phi] (* r (Math/sin phi)))
 
+(def mediums
+  (conj (set (repeatedly 400 #(rand-int 3142))) 8))
 
 (defn setup-vehicle [idx location]
   {:acceleration [0 0]
@@ -16,9 +18,10 @@
    :velocity [0 0]
    :location location
    :r 10.0
+   :stage (if (mediums idx) "MEDIUM" "SMALL")
    :maxspeed (if (or (= idx 8.0)
                      (> (q/random 1) 0.5)) 3.0 1.5)
-   :maxforce 0.1})
+   :maxforce (if (mediums idx) 1 0.1)})
 
 (def movers
   (for [i (range 0 q/TWO-PI 0.002)]
@@ -26,13 +29,14 @@
       (setup-vehicle idx
                      [(x (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))
                       (y (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))]))))
-
 (defn setup []
   (q/text-align :center)
   (q/text-size 12)
   (q/no-stroke)
   {:movers movers
+   :medium-opacity 0.0
    :small-venue-opacity 0.0})
+
 
 (defn update-vehicle [{:keys [velocity acceleration maxspeed location] :as vehicle}]
   (let [velocity (v/add velocity acceleration)]
@@ -54,29 +58,34 @@
     (q/constrain (q/map-range 105 100 120 0 1) 0 1)))
 
 (defn update-state [{:keys [movers]} scroll-pos]
-  {:small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
-   :movers
-   (map
-    (fn [{[lx ly] :location :keys [idx] :as mover}]
-      (update-vehicle
-       (seek mover
-             (let [phi (q/atan2 ly lx)]
-               [(x (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))
-                (y (+ (* 2.5 (mod idx 15)) r) (+ phi 0.05))]))))
-    movers)})
+  (let [medium-opacity (q/constrain (q/map-range scroll-pos 200 250 0 255) 0 255)]
+    {:small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
+     :medium-opacity medium-opacity
+     :movers
+     (map
+      (fn [{[lx ly] :location :keys [idx] :as mover}]
+        (update-vehicle
+         (seek mover
+               (let [phi (q/atan2 ly lx)
+                     r (if (and (> medium-opacity 0.0) (= (:stage mover) "MEDIUM") (> scroll-pos 200))
+                         (+ (* 5 (mod idx 5)) (* 0.6 r))
+                         (+ (* 2.5 (mod idx 15)) r))]
+                 [(x r (+ phi 0.05))
+                  (y r (+ phi 0.05))]))))
+      movers)}))
 
 (defn draw-mover [{[x y] :location
-                   :keys [idx]}]
+                   :keys [idx stage]} medium-opacity]
   (q/stroke nil)
-  (if (= idx 8.0)
+  (if (and (= idx 8.0) (= medium-opacity 0.0))
     (do
       (q/fill 255)
       (q/text "Sylvan Esso" x (- y 8))
       (q/fill 255 0 200)
       (q/ellipse x y 4 4))
     (do
-      (q/fill 255 100)
-      (q/ellipse x y 3 3))))
+      (if (and (> medium-opacity 0.0) (= stage "MEDIUM")) (q/fill 174 219 71 200) (q/fill 255 100))
+      (if (and (> medium-opacity 0.0) (= stage "MEDIUM")) (q/ellipse x y 5 5) (q/ellipse x y 3 3)))))
 
 (defn drop-every-n [n col]
   (keep-indexed
@@ -87,11 +96,17 @@
           nil))
     col))
 
-(defn draw-small-venue [opacity]
-  (let [str "SMALL VENUE"
-        total-angle (/ (q/text-width str) r)]
-    (q/stroke 0)
-    (q/fill 200 opacity)
+(defn draw-dashed-circle [r]
+  (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
+    (q/begin-shape)
+    (doseq [i dash]
+      (q/vertex
+       (x (+ 40 r) i)
+       (y (+ 40 r) i)))
+    (q/end-shape)))
+
+(defn draw-curved-text [str r]
+  (let [total-angle (/ (q/text-width str) r)]
     (loop [str str
            arc-length 0]
       (let [c (first str)
@@ -106,20 +121,25 @@
         (q/pop-matrix)
         (when (> (count str) 1)
           (recur (drop 1 str)
-                 (+ arc-length c-width))))))
-  (q/stroke 200 opacity)
-  (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
-    (q/begin-shape)
-    (doseq [i dash]
-      (q/vertex
-       (x (+ 40 r) i)
-       (y (+ 40 r) i)))
-    (q/end-shape)))
+                 (+ arc-length c-width)))))))
 
-(defn draw [{:keys [small-venue-opacity movers]}]
+(defn draw-small-venue [opacity]
+  (q/stroke 0)
+  (q/fill 200 opacity)
+  (draw-curved-text "SMALL VENUE" (+ r 10))
+  (q/stroke 200 opacity)
+  (draw-dashed-circle (+ r 10)))
+
+(defn draw [{:keys [medium-opacity small-venue-opacity movers]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
   (draw-small-venue small-venue-opacity)
+  (when (> medium-opacity 0.0)
+    (q/stroke 0)
+    (q/fill 200 medium-opacity)
+    (draw-curved-text "MEDIUM" (* r 0.6))
+    (q/stroke 200 medium-opacity)
+    (draw-dashed-circle (* r 0.6)))
   (doseq [mover movers]
-      (draw-mover mover)))
+      (draw-mover mover medium-opacity)))
