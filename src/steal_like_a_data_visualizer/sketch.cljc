@@ -9,36 +9,39 @@
 (defn x [r phi] (* r (Math/cos phi)))
 (defn y [r phi] (* r (Math/sin phi)))
 
-(def mediums
+(def medium-band-idxs
   (conj (set (repeatedly 400 #(rand-int 3142))) 8))
 
-(defn setup-vehicle [idx location]
+(defn setup-band [idx location]
   {:acceleration [0 0]
    :idx idx
    :velocity [0 0]
    :location location
    :r 10.0
-   :stage (if (mediums idx) "MEDIUM" "SMALL")
+   :stage (cond
+            (= idx 8.0) :sylvan-esso
+            (medium-band-idxs idx) :medium
+            :else :small)
    :maxspeed (if (or (= idx 8.0)
                      (> (q/random 1) 0.5)) 3.0 1.5)
-   :maxforce (if (mediums idx) 1 0.1)})
+   :maxforce (if (medium-band-idxs idx) 1 0.1)})
 
-(def movers
+(def bands
   (for [i (range 0 q/TWO-PI 0.002)]
     (let [idx (int (* i 500))]
-      (setup-vehicle idx
+      (setup-band idx
                      [(x (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))
                       (y (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))]))))
 (defn setup []
   (q/text-align :center)
   (q/text-size 12)
   (q/no-stroke)
-  {:movers movers
-   :medium-opacity 0.0
+  {:bands bands
+   :medium-venue-opacity 0.0
    :small-venue-opacity 0.0})
 
 
-(defn update-vehicle [{:keys [velocity acceleration maxspeed location] :as vehicle}]
+(defn update-band [{:keys [velocity acceleration maxspeed location] :as vehicle}]
   (let [velocity (v/add velocity acceleration)]
     (-> vehicle
         (assoc :velocity (v/limit velocity maxspeed))
@@ -57,35 +60,22 @@
   (q/with-sketch (q/get-sketch-by-id "sketch")
     (q/constrain (q/map-range 105 100 120 0 1) 0 1)))
 
-(defn update-state [{:keys [movers]} scroll-pos]
-  (let [medium-opacity (q/constrain (q/map-range scroll-pos 200 250 0 255) 0 255)]
+(defn update-state [{:keys [bands]} scroll-pos]
+  (let [medium-venue-opacity (q/constrain (q/map-range scroll-pos 200 250 0 255) 0 255)]
     {:small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
-     :medium-opacity medium-opacity
-     :movers
+     :medium-venue-opacity medium-venue-opacity
+     :bands
      (map
-      (fn [{[lx ly] :location :keys [idx] :as mover}]
-        (update-vehicle
-         (seek mover
+      (fn [{[lx ly] :location :keys [idx] :as band}]
+        (update-band
+         (seek band
                (let [phi (q/atan2 ly lx)
-                     r (if (and (> medium-opacity 0.0) (= (:stage mover) "MEDIUM") (> scroll-pos 200))
+                     r (if (and (> medium-venue-opacity 0.0) (or (= (:stage band) :medium) (= (:stage band) :sylvan-esso)) (> scroll-pos 200))
                          (+ (* 5 (mod idx 5)) (* 0.6 r))
                          (+ (* 2.5 (mod idx 15)) r))]
                  [(x r (+ phi 0.05))
                   (y r (+ phi 0.05))]))))
-      movers)}))
-
-(defn draw-mover [{[x y] :location
-                   :keys [idx stage]} medium-opacity]
-  (q/stroke nil)
-  (if (and (= idx 8.0) (= medium-opacity 0.0))
-    (do
-      (q/fill 255)
-      (q/text "Sylvan Esso" x (- y 8))
-      (q/fill 255 0 200)
-      (q/ellipse x y 4 4))
-    (do
-      (if (and (> medium-opacity 0.0) (= stage "MEDIUM")) (q/fill 174 219 71 200) (q/fill 255 100))
-      (if (and (> medium-opacity 0.0) (= stage "MEDIUM")) (q/ellipse x y 5 5) (q/ellipse x y 3 3)))))
+      bands)}))
 
 (defn drop-every-n [n col]
   (keep-indexed
@@ -95,6 +85,36 @@
           item
           nil))
     col))
+
+(defmulti draw-band (fn [band _] (:stage band)))
+
+(defmethod draw-band :sylvan-esso [{[x y] :location} medium-venue-opacity]
+  (q/stroke nil)
+  (let [a (q/map-range medium-venue-opacity 0 255 255 0)]
+    (q/fill 255 a))
+  (q/text "Sylvan Esso" x (- y 8))
+  (let [r (q/map-range medium-venue-opacity 0 255 255 255)
+        g (q/map-range medium-venue-opacity 0 255 0 255)
+        b (q/map-range medium-venue-opacity 0 255 200 255)
+        a (q/map-range medium-venue-opacity 0 255 255 100)]
+    (q/fill r g b a))
+  (let [size (q/map-range medium-venue-opacity 0 255 4 5)]
+    (q/ellipse x y size size)))
+
+(defmethod draw-band :small [{[x y] :location} medium-venue-opacity]
+  (q/stroke nil)
+  (q/fill 255 (q/map-range medium-venue-opacity 0 255 100 50))
+  (q/ellipse x y 3 3))
+
+(defmethod draw-band :medium [{[x y] :location} medium-venue-opacity]
+  (q/stroke nil)
+  (let [r (q/map-range medium-venue-opacity 0 255 255 174)
+        g (q/map-range medium-venue-opacity 0 255 255 219)
+        b (q/map-range medium-venue-opacity 0 255 255 71)
+        a (q/map-range medium-venue-opacity 0 255 50 100)]
+    (q/fill r g b a))
+  (let [size (q/map-range medium-venue-opacity 0 255 3 5)]
+    (q/ellipse x y size size)))
 
 (defn draw-dashed-circle [r]
   (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
@@ -130,16 +150,18 @@
   (q/stroke 200 opacity)
   (draw-dashed-circle (+ r 10)))
 
-(defn draw [{:keys [medium-opacity small-venue-opacity movers]}]
+(defn draw-medium-venue [opacity]
+    (q/stroke 0)
+    (q/fill 200 opacity)
+    (draw-curved-text "MEDIUM" (* r 0.6))
+    (q/stroke 200 opacity)
+    (draw-dashed-circle (* r 0.6)))
+
+(defn draw [{:keys [medium-venue-opacity small-venue-opacity bands]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
   (draw-small-venue small-venue-opacity)
-  (when (> medium-opacity 0.0)
-    (q/stroke 0)
-    (q/fill 200 medium-opacity)
-    (draw-curved-text "MEDIUM" (* r 0.6))
-    (q/stroke 200 medium-opacity)
-    (draw-dashed-circle (* r 0.6)))
-  (doseq [mover movers]
-      (draw-mover mover medium-opacity)))
+  (draw-medium-venue medium-venue-opacity)
+  (doseq [band bands]
+    (draw-band band medium-venue-opacity)))
