@@ -28,7 +28,7 @@
       [:div.pa3.sans-serif
        [:h2 "Steal Like a Data Visualizer"]
        [:div#scroll {:style {:overflow "scroll" :width 549 :height 533}}
-        [:div {:style {:height 2000 }}
+        [:div {:style {:height 883 }}
          [:div#sketch {:style {:position "fixed" :top 83}}]]]])}))
 
 (dom/render [app] (.getElementById js/document "app"))
