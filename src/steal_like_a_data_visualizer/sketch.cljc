@@ -1,13 +1,40 @@
 (ns steal-like-a-data-visualizer.sketch
-  (:require [quil.core :as q]
-            [steal-like-a-data-visualizer.vector :as v]))
+  (:require [quil.core :as q]))
 
-(def margin {:top 10 :bottom 10 :left 10 :right 10})
 (def width 533)
 (def height 533)
+(def margin {:top 10 :bottom 10 :left 10 :right 10})
 (def r (- 200 (:left margin) (:right margin)))
+
 (defn x [r phi] (* r (Math/cos phi)))
 (defn y [r phi] (* r (Math/sin phi)))
+
+(defn add
+  ([v] v)
+  ([[x1 y1] [x2 y2]]
+   [(+ x1 x2) (+ y1 y2)])
+  ([v1 v2 & vs]
+   (apply add (add v1 v2) vs)))
+(defn mult [v1 n] (vector (* (first v1) n) (* (second v1) n)))
+(defn div [[x y] n] (if (or (= n 0) (= n 0.0))
+                      (vector x y)
+                      (vector (/ x n) (/ y n))))
+(defn normalize [[[vx vy]]]
+  (let [m (q/mag vx vy)]
+    (if (not (= m 0.0)) (div [vx vy] m) [vx vy])))
+(defn limit [[x y] top]
+  (if (> (q/mag x y) top)
+    (mult (normalize [x y]) top)
+    [x y]))
+
+(defn drop-every-n [n col]
+  (keep-indexed
+    (fn [index item]
+      (if
+        (not= 0 (mod (inc index) n))
+          item
+          nil))
+    col))
 
 (def medium-band-idxs
   (set (repeatedly 400 #(rand-int 3142))))
@@ -63,25 +90,29 @@
    :small-venue-opacity 0.0})
 
 (defn apply-force [{:keys [acceleration] :as vehicle} force]
-  (assoc vehicle :acceleration (v/add acceleration force)))
+  (assoc vehicle :acceleration (add acceleration force)))
 
-(defn update-band [{:keys [velocity acceleration maxspeed location] :as vehicle}]
-  (let [velocity (v/add velocity acceleration)]
+(defn update-vehicle [{:keys [velocity acceleration maxspeed location] :as vehicle}]
+  (let [velocity (add velocity acceleration)]
     (-> vehicle
-        (assoc :velocity (v/limit velocity maxspeed))
-        (assoc :location (v/add location velocity))
-        (assoc :acceleration (v/mult acceleration 0)))))
+        (assoc :velocity (limit velocity maxspeed))
+        (assoc :location (add location velocity))
+        (assoc :acceleration (mult acceleration 0)))))
 
-(defn seek [{:keys [location maxspeed velocity maxforce] :as vehicle} target]
-  (let [desired (v/mult (v/normalize (v/sub target location)) maxspeed)
-        steer (v/limit (v/sub desired velocity) maxforce)]
+(defn seek [{[x1 y1] :location
+             [vx vy] :velocity
+             :keys [maxspeed maxforce] :as vehicle} {[x2 y2] :target}]
+  (let [[dx dy] (mult (normalize (q/dist x2 y2 x1 y1)) maxspeed)
+        steer (limit (q/dist dx dy vx vy) maxforce)]
     (apply-force vehicle steer)))
 
-(defn arrive [{:keys [location maxspeed velocity maxforce] :as vehicle} target]
-  (let [desired (v/sub target location)
-        d (v/mag desired)
-        steer (v/limit (v/sub (v/mult (v/normalize desired) (if (< d 5) (q/map-range d 0 5 0 maxspeed) maxspeed))
-                              velocity) maxforce)]
+(defn arrive [{[x1 y1] :location
+               [vx vy] :velocity
+               :keys [maxspeed maxforce] :as vehicle} {[x2 y2] :target}]
+  (let [desired (q/dist x1 y1 x2 y2)
+        d (apply q/mag desired)
+        [tx ty] (mult (normalize desired) (if (< d 5) (q/map-range d 0 5 0 maxspeed) maxspeed))
+        steer (limit (q/dist tx ty vx vy) maxforce)]
     (apply-force vehicle steer)))
 
 (defn next-coord-in-circle [{[lx ly] :location} r]
@@ -116,22 +147,7 @@
     {:small-venue-opacity small-venue-opacity
      :medium-venue-opacity medium-venue-opacity
      :big-venue-opacity big-venue-opacity
-     :bands
-     (map
-      (fn [band]
-        (-> band
-            (update-target scroll-pos)
-            update-band))
-      bands)}))
-
-(defn drop-every-n [n col]
-  (keep-indexed
-    (fn [index item]
-      (if
-        (not= 0 (mod (inc index) n))
-          item
-          nil))
-    col))
+     :bands (map #(update-vehicle (update-target % scroll-pos)) bands)}))
 
 (defmulti draw-band (fn [band _ _] (:type band)))
 
