@@ -186,17 +186,10 @@
   (let [size (q/map-range big-venue-opacity 0 255 5 20)]
     (q/ellipse x y size size)))
 
-(defn draw-dashed-circle [r]
-  (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
-    (q/begin-shape)
-    (doseq [i dash]
-      (q/vertex
-       (x (+ 40 r) i)
-       (y (+ 40 r) i)))
-    (q/end-shape)))
-
-(defn draw-curved-text [str r]
-  (let [total-angle (/ (q/text-width str) r)]
+(defn draw-venue [text r opacity]
+  (q/stroke 0)
+  (q/fill 200 opacity)
+  (let [total-angle (/ (q/text-width text) r)]
     (loop [str str
            arc-length 0]
       (let [c (first str)
@@ -211,37 +204,24 @@
         (q/pop-matrix)
         (when (> (count str) 1)
           (recur (drop 1 str)
-                 (+ arc-length c-width)))))))
-
-(defn draw-small-venue [opacity]
-  (q/stroke 0)
-  (q/fill 200 opacity)
-  (draw-curved-text "SMALL VENUE" (+ r 10))
+                 (+ arc-length c-width))))))
   (q/stroke 200 opacity)
-  (draw-dashed-circle (+ r 10)))
-
-(defn draw-medium-venue [opacity]
-    (q/stroke 0)
-    (q/fill 200 opacity)
-    (draw-curved-text "MEDIUM" (* r 0.6))
-    (q/stroke 200 opacity)
-    (draw-dashed-circle (* r 0.6)))
-
-(defn draw-big-venue [opacity]
-    (q/stroke 0)
-    (q/fill 200 opacity)
-    (draw-curved-text "BIG" (* r 0.25))
-    (q/stroke 200 opacity)
-    (draw-dashed-circle (* r 0.25)))
+  (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
+    (q/begin-shape)
+    (doseq [i dash]
+      (q/vertex
+       (x (+ 40 r) i)
+       (y (+ 40 r) i)))
+    (q/end-shape)))
 
 (defn draw [{:keys [big-venue-opacity medium-venue-opacity small-venue-opacity bands
                     scroll-pos]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
-  (draw-small-venue small-venue-opacity)
-  (draw-medium-venue medium-venue-opacity)
-  (draw-big-venue big-venue-opacity)
+  (draw-venue "SMALL VENUE" (+ r 10 ) small-venue-opacity)
+  (draw-venue "MEDIUM" (* r 0.6) medium-venue-opacity)
+  (draw-venue "BIG" (* r 0.25) big-venue-opacity)
   (q/fill 232 92 134 big-venue-opacity)
   (q/stroke 0)
   (doseq [band bands]
