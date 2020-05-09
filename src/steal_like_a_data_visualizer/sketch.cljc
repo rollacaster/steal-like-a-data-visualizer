@@ -147,37 +147,27 @@
     {:small-venue-opacity small-venue-opacity
      :medium-venue-opacity medium-venue-opacity
      :big-venue-opacity big-venue-opacity
+     :scroll-pos scroll-pos
      :bands (map #(update-vehicle (update-target % scroll-pos)) bands)}))
 
-(defmulti draw-band (fn [band _ _] (:type band)))
-
-(defmethod draw-band ::sylvan-esso [{[x y] :location} medium-venue-opacity big-venue-opacity]
+(defmulti draw-band (fn [band scroll-pos _ _ _] [(:type band) (venue-by-scroll-pos scroll-pos)]))
+(defmethod draw-band [::sylvan-esso :small-venue] [{[x y] :location} medium-venue-opacity]
   (q/stroke nil)
   (let [a (q/map-range medium-venue-opacity 0 255 255 0)]
     (q/fill 255 a))
   (q/text "Sylvan Esso" x (- y 8))
-  (let [r (if (> big-venue-opacity 0)
-            (q/map-range big-venue-opacity 0 255 174 255)
-            (q/map-range medium-venue-opacity 0 255 255 174))
-        g (if (> big-venue-opacity 0)
-            (q/map-range medium-venue-opacity 0 255 219 190)
-            (q/map-range medium-venue-opacity 0 255 0 219))
-        b (if (> big-venue-opacity 0)
-            (q/map-range medium-venue-opacity 0 255 71 210)
-            (q/map-range medium-venue-opacity 0 255 200 71))
+  (let [r (q/map-range medium-venue-opacity 0 255 255 174)
+        g (q/map-range medium-venue-opacity 0 255 0 219)
+        b (q/map-range medium-venue-opacity 0 255 200 71)
         a (q/map-range medium-venue-opacity 0 255 255 100)]
     (q/fill r g b a))
-  (let [size (if (>= big-venue-opacity 0)
-                 (q/map-range big-venue-opacity 0 255 5 20)
-                 (q/map-range medium-venue-opacity 0 255 4 5))]
+  (let [size (q/map-range medium-venue-opacity 0 255 4 5)]
     (q/ellipse x y size size)))
-
-(defmethod draw-band ::small-band [{[x y] :location} medium-venue-opacity _]
+(defmethod draw-band [::small-band ::small-venue] [{[x y] :location} medium-venue-opacity]
   (q/stroke nil)
   (q/fill 255 (q/map-range medium-venue-opacity 0 255 100 50))
   (q/ellipse x y 3 3))
-
-(defmethod draw-band ::medium-band [{[x y] :location} medium-venue-opacity _]
+(defmethod draw-band [::medium-band ::medium-venue] [{[x y] :location} medium-venue-opacity]
   (q/stroke nil)
   (let [r (q/map-range medium-venue-opacity 0 255 255 174)
         g (q/map-range medium-venue-opacity 0 255 255 219)
@@ -186,23 +176,14 @@
     (q/fill r g b a))
   (let [size (q/map-range medium-venue-opacity 0 255 3 5)]
     (q/ellipse x y size size)))
-
-(defmethod draw-band ::big-band [{[x y] :location} medium-venue-opacity big-venue-opacity]
+(defmethod draw-band [::big-band ::big-venue] [{[x y] :location} medium-venue-opacity big-venue-opacity]
   (q/stroke nil)
-  (let [r (if (> big-venue-opacity 0)
-            (q/map-range big-venue-opacity 0 255 174 255)
-            (q/map-range medium-venue-opacity 0 255 255 174))
-        g (if (> big-venue-opacity 0)
-            (q/map-range big-venue-opacity 0 255 219 190)
-            (q/map-range medium-venue-opacity 0 255 255 219))
-        b (if (> big-venue-opacity 0)
-            (q/map-range big-venue-opacity 0 255 71 210)
-            (q/map-range medium-venue-opacity 0 255 255 71))
+  (let [r (q/map-range big-venue-opacity 0 255 174 255)
+        g (q/map-range big-venue-opacity 0 255 219 190)
+        b (q/map-range big-venue-opacity 0 255 71 210)
         a (q/map-range medium-venue-opacity 0 255 50 100)]
     (q/fill r g b a))
-  (let [size (if (>= big-venue-opacity 0)
-                 (q/map-range big-venue-opacity 0 255 5 20)
-                 (q/map-range medium-venue-opacity 0 255 3 5))]
+  (let [size (q/map-range big-venue-opacity 0 255 5 20)]
     (q/ellipse x y size size)))
 
 (defn draw-dashed-circle [r]
@@ -253,7 +234,8 @@
     (q/stroke 200 opacity)
     (draw-dashed-circle (* r 0.25)))
 
-(defn draw [{:keys [big-venue-opacity medium-venue-opacity small-venue-opacity bands]}]
+(defn draw [{:keys [big-venue-opacity medium-venue-opacity small-venue-opacity bands
+                    scroll-pos]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
@@ -263,4 +245,4 @@
   (q/fill 232 92 134 big-venue-opacity)
   (q/stroke 0)
   (doseq [band bands]
-    (draw-band band medium-venue-opacity big-venue-opacity)))
+    (draw-band band scroll-pos medium-venue-opacity big-venue-opacity)))
