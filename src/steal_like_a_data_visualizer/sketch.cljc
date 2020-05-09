@@ -89,24 +89,41 @@
     [(x r (+ phi 0.05))
      (y r (+ phi 0.05))]))
 
-(defmulti update-target (fn [band _] (:type band)) :default :default)
+(defn venue-by-scroll-pos [scroll-pos]
+  (cond
+    (> scroll-pos 300) :big
+    (> scroll-pos 200) :medium
+    :else :small))
 
-(defmethod update-target :small [band _]
+(defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]) :default [:default :default])
+
+(defmethod update-target [:small :big] [band]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
+(defmethod update-target [:small :small] [band]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
+(defmethod update-target [:small :medium] [band]
   (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
 
-(defmethod update-target :medium [{:keys [idx] :as band} scroll-pos]
-  (seek band
-        (next-coord-in-circle band (if (> scroll-pos 200)
-                                     (+ (* 5 (mod idx 5)) (* 0.6 r))
-                                     (+ (* 2.5 (mod idx 15)) r)))))
+(defmethod update-target [:medium :small] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
+(defmethod update-target [:medium :medium] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
+(defmethod update-target [:medium :big] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
 
-(defmethod update-target :default [{:keys [idx] :as band} scroll-pos]
-  (if (> scroll-pos 300)
-    (arrive band (:big-target band))
-    (seek band
-          (next-coord-in-circle band (if (> scroll-pos 200)
-                                       (+ (* 5 (mod idx 5)) (* 0.6 r))
-                                       (+ (* 2.5 (mod idx 15)) r))))))
+(defmethod update-target [:big :small] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
+(defmethod update-target [:big :medium] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
+(defmethod update-target [:big :big] [band]
+  (arrive band (:big-target band)))
+
+(defmethod update-target [:sylvan-esso :small] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
+(defmethod update-target [:sylvan-esso :medium] [{:keys [idx] :as band}]
+  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
+(defmethod update-target [:sylvan-esso :big] [band]
+  (arrive band (:big-target band)))
 
 (defn update-state [{:keys [bands]} scroll-pos]
   (let [small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
