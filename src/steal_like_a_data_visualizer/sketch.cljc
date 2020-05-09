@@ -22,6 +22,7 @@
                              [-30 60] [-10 60] [10 60] [30 60]
                              [-20 80] [0 80] [20 80]
                              [-10 100] [10 100]]))
+
 (defn setup-band [idx location]
   {:acceleration [0 0]
    :idx idx
@@ -34,7 +35,7 @@
                    (let [big-i (some (fn [[find-i big-i]] (when (= big-i idx) find-i))
                                      (map-indexed (fn [idx val] [idx val])big-band-idxs))]
                      (when big-i (nth big-bands-targets big-i)))))
-   :stage (cond
+   :type (cond
             (= idx 8.0) :sylvan-esso
             (big-band-idxs idx) :big
             (medium-band-idxs idx) :medium
@@ -61,6 +62,8 @@
    :medium-venue-opacity 0.0
    :small-venue-opacity 0.0})
 
+(defn apply-force [{:keys [acceleration] :as vehicle} force]
+  (assoc vehicle :acceleration (v/add acceleration force)))
 
 (defn update-band [{:keys [velocity acceleration maxspeed location] :as vehicle}]
   (let [velocity (v/add velocity acceleration)]
@@ -68,9 +71,6 @@
         (assoc :velocity (v/limit velocity maxspeed))
         (assoc :location (v/add location velocity))
         (assoc :acceleration (v/mult acceleration 0)))))
-
-(defn apply-force [{:keys [acceleration] :as vehicle} force]
-  (assoc vehicle :acceleration (v/add acceleration force)))
 
 (defn seek [{:keys [location maxspeed velocity maxforce] :as vehicle} target]
   (let [desired (v/mult (v/normalize (v/sub target location)) maxspeed)
@@ -84,6 +84,30 @@
                               velocity) maxforce)]
     (apply-force vehicle steer)))
 
+(defn next-coord-in-circle [{[lx ly] :location} r]
+  (let [phi (q/atan2 ly lx)]
+    [(x r (+ phi 0.05))
+     (y r (+ phi 0.05))]))
+
+(defmulti update-target (fn [band _] (:type band)) :default :default)
+
+(defmethod update-target :small [band _]
+  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
+
+(defmethod update-target :medium [{:keys [idx] :as band} scroll-pos]
+  (seek band
+        (next-coord-in-circle band (if (> scroll-pos 200)
+                                     (+ (* 5 (mod idx 5)) (* 0.6 r))
+                                     (+ (* 2.5 (mod idx 15)) r)))))
+
+(defmethod update-target :default [{:keys [idx] :as band} scroll-pos]
+  (if (> scroll-pos 300)
+    (arrive band (:big-target band))
+    (seek band
+          (next-coord-in-circle band (if (> scroll-pos 200)
+                                       (+ (* 5 (mod idx 5)) (* 0.6 r))
+                                       (+ (* 2.5 (mod idx 15)) r))))))
+
 (defn update-state [{:keys [bands]} scroll-pos]
   (let [small-venue-opacity (q/constrain (q/map-range scroll-pos 100 150 0 255) 0 255)
         medium-venue-opacity (q/constrain (q/map-range scroll-pos 200 250 0 255) 0 255)
@@ -93,19 +117,10 @@
      :big-venue-opacity big-venue-opacity
      :bands
      (map
-      (fn [{[lx ly] :location :keys [idx] :as band}]
-        (update-band
-         (if (and (or (= (:stage band) :big) (= (:stage band) :sylvan-esso))
-                  (> scroll-pos 300))
-           (arrive band (:big-target band))
-           (seek band
-                  (let [phi (q/atan2 ly lx)
-                        r (if (and (or (= (:stage band) :big) (= (:stage band) :medium) (= (:stage band) :sylvan-esso))
-                                   (> scroll-pos 200))
-                            (+ (* 5 (mod idx 5)) (* 0.6 r))
-                            (+ (* 2.5 (mod idx 15)) r))]
-                    [(x r (+ phi 0.05))
-                     (y r (+ phi 0.05))])))))
+      (fn [band]
+        (-> band
+            (update-target scroll-pos)
+            update-band))
       bands)}))
 
 (defn drop-every-n [n col]
@@ -117,7 +132,7 @@
           nil))
     col))
 
-(defmulti draw-band (fn [band _ _] (:stage band)))
+(defmulti draw-band (fn [band _ _] (:type band)))
 
 (defmethod draw-band :sylvan-esso [{[x y] :location} medium-venue-opacity big-venue-opacity]
   (q/stroke nil)
@@ -232,4 +247,3 @@
   (q/stroke 0)
   (doseq [band bands]
     (draw-band band medium-venue-opacity big-venue-opacity)))
-
