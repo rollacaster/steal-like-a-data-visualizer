@@ -36,10 +36,10 @@
                                      (map-indexed (fn [idx val] [idx val])big-band-idxs))]
                      (when big-i (nth big-bands-targets big-i)))))
    :type (cond
-            (= idx 8.0) :sylvan-esso
-            (big-band-idxs idx) :big
-            (medium-band-idxs idx) :medium
-            :else :small)
+            (= idx 8.0) ::sylvan-esso
+            (big-band-idxs idx) ::big-band
+            (medium-band-idxs idx) ::medium-band
+            :else ::small-band)
    :maxspeed (cond (or (= idx 8.0) (> (q/random 1) 0.5)) 3.0
                    :else 1.5)
    :maxforce (cond
@@ -91,38 +91,22 @@
 
 (defn venue-by-scroll-pos [scroll-pos]
   (cond
-    (> scroll-pos 300) :big
-    (> scroll-pos 200) :medium
-    :else :small))
+    (> scroll-pos 300) ::big-venue
+    (> scroll-pos 200) ::medium-venue
+    :else ::small-venue))
 
-(defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]) :default [:default :default])
+(derive ::sylvan-esso ::big-band)
+(derive ::medium-band ::small-band)
+(derive ::big-band ::medium-band)
+(derive ::big-venue ::medium-venue)
+(derive ::medium-venue ::small-venue)
 
-(defmethod update-target [:small :big] [band]
-  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
-(defmethod update-target [:small :small] [band]
-  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
-(defmethod update-target [:small :medium] [band]
-  (seek band (next-coord-in-circle band (+ (* 2.5 (mod (:idx band) 15)) r))))
-
-(defmethod update-target [:medium :small] [{:keys [idx] :as band}]
+(defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
+(defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band}]
   (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
-(defmethod update-target [:medium :medium] [{:keys [idx] :as band}]
+(defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band}]
   (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [:medium :big] [{:keys [idx] :as band}]
-  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-
-(defmethod update-target [:big :small] [{:keys [idx] :as band}]
-  (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
-(defmethod update-target [:big :medium] [{:keys [idx] :as band}]
-  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [:big :big] [band]
-  (arrive band (:big-target band)))
-
-(defmethod update-target [:sylvan-esso :small] [{:keys [idx] :as band}]
-  (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
-(defmethod update-target [:sylvan-esso :medium] [{:keys [idx] :as band}]
-  (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [:sylvan-esso :big] [band]
+(defmethod update-target [::big-band ::big-venue] [band]
   (arrive band (:big-target band)))
 
 (defn update-state [{:keys [bands]} scroll-pos]
@@ -151,7 +135,7 @@
 
 (defmulti draw-band (fn [band _ _] (:type band)))
 
-(defmethod draw-band :sylvan-esso [{[x y] :location} medium-venue-opacity big-venue-opacity]
+(defmethod draw-band ::sylvan-esso [{[x y] :location} medium-venue-opacity big-venue-opacity]
   (q/stroke nil)
   (let [a (q/map-range medium-venue-opacity 0 255 255 0)]
     (q/fill 255 a))
@@ -172,12 +156,12 @@
                  (q/map-range medium-venue-opacity 0 255 4 5))]
     (q/ellipse x y size size)))
 
-(defmethod draw-band :small [{[x y] :location} medium-venue-opacity _]
+(defmethod draw-band ::small-band [{[x y] :location} medium-venue-opacity _]
   (q/stroke nil)
   (q/fill 255 (q/map-range medium-venue-opacity 0 255 100 50))
   (q/ellipse x y 3 3))
 
-(defmethod draw-band :medium [{[x y] :location} medium-venue-opacity _]
+(defmethod draw-band ::medium-band [{[x y] :location} medium-venue-opacity _]
   (q/stroke nil)
   (let [r (q/map-range medium-venue-opacity 0 255 255 174)
         g (q/map-range medium-venue-opacity 0 255 255 219)
@@ -187,7 +171,7 @@
   (let [size (q/map-range medium-venue-opacity 0 255 3 5)]
     (q/ellipse x y size size)))
 
-(defmethod draw-band :big [{[x y] :location} medium-venue-opacity big-venue-opacity]
+(defmethod draw-band ::big-band [{[x y] :location} medium-venue-opacity big-venue-opacity]
   (q/stroke nil)
   (let [r (if (> big-venue-opacity 0)
             (q/map-range big-venue-opacity 0 255 174 255)
