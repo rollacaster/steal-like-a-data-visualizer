@@ -55,19 +55,25 @@
 (def big-band-idxs
   (conj (set (take 20 medium-band-idxs)) sylvan-esso-id))
 (def big-bands-targets
-  (zipmap big-band-idxs (map (fn [[x y]] [x (- y 50)])
-                             [[-20 0] [0 0] [20 0]
-                              [-30 20] [-10 20] [10 20] [30 20]
-                              [-40 40] [-20 40] [0 40] [20 40] [40 40]
-                              [-30 60] [-10 60] [10 60] [30 60]
-                              [-20 80] [0 80] [20 80]
-                              [-10 100] [10 100]])))
+  (zipmap big-band-idxs
+          (let [x-step 25
+                y-step 20]
+            (map (fn [[x y]] [x (- y 50)])
+                 (mapcat
+                  (fn [y xs]
+                    (map (fn [x] [x y]) xs))
+                  (range 0 (inc (* 5 y-step)) y-step)
+                  [(range (- x-step) (inc x-step) x-step)
+                   (range (* 1.5 (- x-step)) (inc (* 1.5 x-step)) x-step)
+                   (range (* 2 (- x-step)) (inc (* 2 x-step)) x-step)
+                   (range (* 1.5 (- x-step)) (inc (* 1.5 x-step)) x-step)
+                   (range (- x-step) (inc x-step) x-step)
+                   (range (* 0.5 (- x-step)) (inc (* 0.5 x-step)) x-step)])))))
 (defn setup-band [idx location]
   {:acceleration [0 0]
    :idx idx
    :velocity [0 0]
    :location location
-   :r 10.0
    :type (cond
             (= idx sylvan-esso-id) ::sylvan-esso
             (big-band-idxs idx) ::big-band
@@ -215,6 +221,6 @@
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
   (draw-venue ::small-venue (+ r 10 ) scroll-pos)
   (draw-venue ::medium-venue (* r 0.6) scroll-pos)
-  (draw-venue ::big-venue (* r 0.25) scroll-pos)
+  (draw-venue ::big-venue (* r 0.2) scroll-pos)
   (q/stroke nil)
   (doseq [band bands] (draw-band band scroll-pos)))
