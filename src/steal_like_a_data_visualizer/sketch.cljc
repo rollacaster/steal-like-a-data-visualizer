@@ -1,6 +1,13 @@
 (ns steal-like-a-data-visualizer.sketch
   (:require [quil.core :as q]))
 
+(derive ::medium-band ::small-band)
+(derive ::big-band ::medium-band)
+(derive ::sylvan-esso ::big-band)
+
+(derive ::medium-venue ::small-venue)
+(derive ::big-venue ::medium-venue)
+
 (def width 533)
 (def height 533)
 (def margin {:top 10 :bottom 10 :left 10 :right 10})
@@ -42,45 +49,32 @@
           nil))
     col))
 
+(def sylvan-esso-id 8)
 (def medium-band-idxs
   (set (repeatedly 400 #(rand-int 3142))))
-
 (def big-band-idxs
-  (set (take 20 medium-band-idxs)))
-
-(def big-bands-targets (map (fn [[x y]] [x (- y 50)])
-                            [[-20 0] [0 0] [20 0]
-                             [-30 20] [-10 20] [10 20] [30 20]
-                             [-40 40] [-20 40] [0 40] [20 40] [40 40]
-                             [-30 60] [-10 60] [10 60] [30 60]
-                             [-20 80] [0 80] [20 80]
-                             [-10 100] [10 100]]))
-
+  (conj (set (take 20 medium-band-idxs)) sylvan-esso-id))
+(def big-bands-targets
+  (zipmap big-band-idxs (map (fn [[x y]] [x (- y 50)])
+                             [[-20 0] [0 0] [20 0]
+                              [-30 20] [-10 20] [10 20] [30 20]
+                              [-40 40] [-20 40] [0 40] [20 40] [40 40]
+                              [-30 60] [-10 60] [10 60] [30 60]
+                              [-20 80] [0 80] [20 80]
+                              [-10 100] [10 100]])))
 (defn setup-band [idx location]
   {:acceleration [0 0]
    :idx idx
    :velocity [0 0]
    :location location
    :r 10.0
-   :big-target (if (= idx 8.0)
-                 (last big-bands-targets)
-                 (when (big-band-idxs idx)
-                   (let [big-i (some (fn [[find-i big-i]] (when (= big-i idx) find-i))
-                                     (map-indexed (fn [idx val] [idx val])big-band-idxs))]
-                     (when big-i (nth big-bands-targets big-i)))))
    :type (cond
-            (= idx 8.0) ::sylvan-esso
+            (= idx sylvan-esso-id) ::sylvan-esso
             (big-band-idxs idx) ::big-band
             (medium-band-idxs idx) ::medium-band
             :else ::small-band)
-   :maxspeed (cond (or (= idx 8.0) (> (q/random 1) 0.5)) 3.0
-                   :else 1.5)
-   :maxforce (cond
-               (= idx 8.0) 1
-               (big-band-idxs idx) 1
-               (medium-band-idxs idx) 1
-               :else 0.1)})
-
+   :maxspeed (if (> (q/random 1) 0.5) 3.0 1.5)
+   :maxforce 1})
 (def bands
   (for [i (range 0 q/TWO-PI 0.002)]
     (let [idx (int (* i 500))]
@@ -127,24 +121,24 @@
     (> scroll-pos 200) ::medium-venue
     :else ::small-venue))
 
-(derive ::medium-band ::small-band)
-(derive ::big-band ::medium-band)
-(derive ::sylvan-esso ::big-band)
-
-(derive ::medium-venue ::small-venue)
-(derive ::big-venue ::medium-venue)
+(defn update-speed [{:keys [type maxspeed] :as band}]
+  (assoc band :maxspeed (case type ::big-band 5 ::sylvan-esso 3 maxspeed)))
 
 (defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
 (defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band}]
   (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
 (defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band}]
   (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [::big-band ::big-venue] [band]
-  (arrive band (:big-target band)))
+(defmethod update-target [::big-band ::big-venue] [{:keys [idx] :as band}]
+  (arrive band (big-bands-targets idx)))
 
 (defn update-state [{:keys [bands]} scroll-pos]
   {:scroll-pos scroll-pos
-   :bands (map #(update-vehicle (update-target % scroll-pos)) bands)})
+   :bands (map #(-> %
+                    update-speed
+                    (update-target scroll-pos)
+                    update-vehicle)
+               bands)})
 
 (defn transition-progress [scroll-pos venue]
   (q/constrain (q/map-range scroll-pos
