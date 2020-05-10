@@ -127,11 +127,12 @@
     (> scroll-pos 200) ::medium-venue
     :else ::small-venue))
 
-(derive ::sylvan-esso ::big-band)
 (derive ::medium-band ::small-band)
 (derive ::big-band ::medium-band)
-(derive ::big-venue ::medium-venue)
+(derive ::sylvan-esso ::big-band)
+
 (derive ::medium-venue ::small-venue)
+(derive ::big-venue ::medium-venue)
 
 (defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
 (defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band}]
@@ -152,8 +153,8 @@
                             0 1) 0 1))
 
 (defmulti draw-band (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
-(defmethod draw-band [::sylvan-esso :small-venue] [{[x y] :location} scroll-pos]
-  (q/stroke nil)
+(prefer-method draw-band [::medium-band ::medium-venue] [::sylvan-esso ::small-venue])
+(defmethod draw-band [::sylvan-esso ::small-venue] [{[x y] :location} scroll-pos]
   (let [a (q/lerp 255 0 (transition-progress scroll-pos ::small-venue))]
     (q/fill 255 a))
   (q/text "Sylvan Esso" x (- y 8))
@@ -165,11 +166,9 @@
   (let [size (q/lerp 4 5 (transition-progress scroll-pos ::small-venue))]
     (q/ellipse x y size size)))
 (defmethod draw-band [::small-band ::small-venue] [{[x y] :location} scroll-pos]
-  (q/stroke nil)
   (q/fill 255 (q/lerp 100 50 (transition-progress scroll-pos ::small-venue)))
   (q/ellipse x y 3 3))
 (defmethod draw-band [::medium-band ::medium-venue] [{[x y] :location} scroll-pos]
-  (q/stroke nil)
   (let [r (q/lerp 255 174 (transition-progress scroll-pos ::medium-venue))
         g (q/lerp 255 219 (transition-progress scroll-pos ::medium-venue))
         b (q/lerp 255 71 (transition-progress scroll-pos ::medium-venue))
@@ -178,7 +177,6 @@
   (let [size (q/lerp 3 5 (transition-progress scroll-pos ::medium-venue))]
     (q/ellipse x y size size)))
 (defmethod draw-band [::big-band ::big-venue] [{[x y] :location} scroll-pos]
-  (q/stroke nil)
   (let [r (q/lerp 174 255 (transition-progress scroll-pos ::big-venue))
         g (q/lerp 219 190 (transition-progress scroll-pos ::big-venue))
         b (q/lerp 71 210 (transition-progress scroll-pos ::big-venue))
@@ -224,5 +222,5 @@
   (draw-venue ::small-venue (+ r 10 ) scroll-pos)
   (draw-venue ::medium-venue (* r 0.6) scroll-pos)
   (draw-venue ::big-venue (* r 0.25) scroll-pos)
-  (q/stroke 0)
+  (q/stroke nil)
   (doseq [band bands] (draw-band band scroll-pos)))
