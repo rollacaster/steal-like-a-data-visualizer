@@ -10,7 +10,7 @@
     :middleware [md/pause-on-error md/fun-mode]
     :setup s/setup
     :draw s/draw
-    :update s/update-state
+    :update (fn [state] (s/update-state state 0))
     :display 1
     :features [:no-bind-output]
     :size [s/width s/height]))

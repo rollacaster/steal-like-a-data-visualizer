@@ -1,13 +1,6 @@
 (ns steal-like-a-data-visualizer.sketch
   (:require [quil.core :as q]))
 
-(derive ::medium-band ::small-band)
-(derive ::big-band ::medium-band)
-(derive ::sylvan-esso ::big-band)
-
-(derive ::medium-venue ::small-venue)
-(derive ::big-venue ::medium-venue)
-
 (def width 533)
 (def height 533)
 (def margin {:top 10 :bottom 10 :left 10 :right 10})
@@ -49,6 +42,11 @@
           nil))
     col))
 
+(derive ::medium-band ::small-band)
+(derive ::big-band ::medium-band)
+(derive ::sylvan-esso ::big-band)
+(derive ::medium-venue ::small-venue)
+(derive ::big-venue ::medium-venue)
 (def sylvan-esso-id 8)
 (def medium-band-idxs
   (set (repeatedly 400 #(rand-int 3142))))
@@ -131,11 +129,11 @@
   (assoc band :maxspeed (case type ::big-band 5 ::sylvan-esso 3 maxspeed)))
 
 (defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
-(defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band}]
+(defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band} _]
   (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
-(defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band}]
+(defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band} _]
   (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [::big-band ::big-venue] [{:keys [idx] :as band}]
+(defmethod update-target [::big-band ::big-venue] [{:keys [idx] :as band} _]
   (arrive band (big-bands-targets idx)))
 
 (defn update-state [{:keys [bands]} scroll-pos]
@@ -189,22 +187,22 @@
   (q/stroke 0)
   (let [opacity (q/lerp 0 255 (transition-progress scroll-pos venue))]
     (q/fill 200 opacity)
-    (let [str (case venue ::small-venue "SMALL VENUE" ::medium-venue "MEDIUM" ::big-venue "BIG")
-          total-angle (/ (q/text-width str) r)]
-      (loop [str str
+    (let [text (case venue ::small-venue "SMALL VENUE" ::medium-venue "MEDIUM" ::big-venue "BIG")
+          total-angle (/ (q/text-width text) r)]
+      (loop [text text
              arc-length 0]
-        (let [c (first str)
-              c-width (q/text-width c)
+        (let [c (first text)
+              c-width (q/text-width (str c))
               theta
               (- (/ (+ arc-length (/ c-width 2)) r)
                  (/ total-angle 2))]
           (q/push-matrix)
           (q/rotate theta)
           (q/translate 0 (- (+ 45 r)))
-          (q/text c 0 0)
+          (q/text (str c) 0 0)
           (q/pop-matrix)
-          (when (> (count str) 1)
-            (recur (drop 1 str)
+          (when (> (count text) 1)
+            (recur (drop 1 text)
                    (+ arc-length c-width))))))
     (q/stroke 200 opacity)
     (doseq [dash (drop-every-n 2 (partition 3 (range 0 q/TWO-PI 0.01)))]
