@@ -1,10 +1,9 @@
 (ns steal-like-a-data-visualizer.sketch
   (:require [quil.core :as q]))
 
-(def width 533)
-(def height 533)
-(def margin {:top 10 :bottom 10 :left 10 :right 10})
-(def r (- 200 (:left margin) (:right margin)))
+(def margin {:top 10 :bottom 10 :left 0 :right 0})
+(defn get-r [width]
+  (- (* 0.30 width) (:left margin) (:right margin)))
 
 (defn x [r phi] (* r (Math/cos phi)))
 (defn y [r phi] (* r (Math/sin phi)))
@@ -79,18 +78,20 @@
             :else ::small-band)
    :maxspeed (if (> (q/random 1) 0.5) 3.0 1.5)
    :maxforce 1})
-(def bands
+(defn bands [r]
   (for [i (range 0 q/TWO-PI 0.002)]
     (let [idx (int (* i 500))]
       (setup-band idx
                      [(x (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))
                       (y (+ (* 2.5 (mod idx 15)) r) (+ i (q/random -0.05 0.05)))]))))
-(defn setup []
+(defn setup [width]
   (q/text-align :center)
   (q/text-size 12)
   (q/no-stroke)
-  {:bands bands
-   :scroll-pos 0})
+  (let [r (get-r width)]
+    {:bands (bands r)
+     :r r
+     :scroll-pos 0}))
 
 (defn apply-force [{:keys [acceleration] :as vehicle} force]
   (assoc vehicle :acceleration (add acceleration force)))
@@ -128,21 +129,24 @@
 (defn update-speed [{:keys [type maxspeed] :as band}]
   (assoc band :maxspeed (case type ::big-band 5 ::sylvan-esso 3 maxspeed)))
 
-(defmulti update-target (fn [band scroll-pos] [(:type band) (venue-by-scroll-pos scroll-pos)]))
-(defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band} _]
+(defmulti update-target (fn [band scroll-pos _] [(:type band) (venue-by-scroll-pos scroll-pos)]))
+(defmethod update-target [::small-band ::small-venue] [{:keys [idx] :as band} _ r]
   (seek band (next-coord-in-circle band (+ (* 2.5 (mod idx 15)) r))))
-(defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band} _]
+(defmethod update-target [::medium-band ::medium-venue] [{:keys [idx] :as band} _ r]
   (seek band (next-coord-in-circle band (+ (* 5 (mod idx 5)) (* 0.6 r)))))
-(defmethod update-target [::big-band ::big-venue] [{:keys [idx] :as band} _]
+(defmethod update-target [::big-band ::big-venue] [{:keys [idx] :as band} _ _]
   (arrive band (big-bands-targets idx)))
 
-(defn update-state [{:keys [bands]} scroll-pos]
-  {:scroll-pos scroll-pos
-   :bands (map #(-> %
-                    update-speed
-                    (update-target scroll-pos)
-                    update-vehicle)
-               bands)})
+(defn update-state [{:keys [bands]} scroll-pos width]
+  (q/resize-sketch width width)
+  (let [r (get-r width)]
+    {:scroll-pos scroll-pos
+     :r r
+     :bands (map #(-> %
+                      update-speed
+                      (update-target scroll-pos r)
+                      update-vehicle)
+                 bands)}))
 
 (defn transition-progress [scroll-pos venue]
   (q/constrain (q/map-range scroll-pos
@@ -180,7 +184,7 @@
         b (q/lerp 71 210 (transition-progress scroll-pos ::big-venue))
         a (q/lerp 50 100 (transition-progress scroll-pos ::big-venue))]
     (q/fill r g b a))
-  (let [size (q/lerp 5 20 (transition-progress scroll-pos ::big-venue))]
+  (let [size (q/lerp 5 15 (transition-progress scroll-pos ::big-venue))]
     (q/ellipse x y size size)))
 
 (defn draw-venue [venue r scroll-pos]
@@ -213,7 +217,7 @@
          (y (+ 40 r) i)))
       (q/end-shape))))
 
-(defn draw [{:keys [bands scroll-pos]}]
+(defn draw [{:keys [bands scroll-pos r]}]
   (q/background 0)
   (q/fill nil)
   (q/translate (/ (q/width) 2) (/ (q/height) 2))
