@@ -2,4 +2,5 @@
         com.bhauman/figwheel-main {:mvn/version "0.2.4"}
         quil {:mvn/version "3.1.0"}
         reagent {:mvn/version "0.10.0"}}
- :paths ["src" "target" "resources"]}
+ :paths ["src" "target" "resources"]
+ :aliases {:dev {:main-opts ["-m" "figwheel.main" "-b" "dev" "-r"]}}}

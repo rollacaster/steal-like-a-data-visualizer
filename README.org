@@ -1,0 +1,8 @@
+* Steal like a data visualizer
+Improving your data visualization skill through theft may sound vicious at first, but it is a very effective learning method and hopefully a great tribute to the original creator.
+** Links:
+   Blog-Post: TODO
+   Code: https://github.com/rollacaster/steal-like-a-data-visualizer/blob/master/src/steal_like_a_data_visualizer/sketch.cljc
+** Run locally
+   1. Install [[https://clojure.org/guides/getting_started#_installation_on_mac_via_code_brew_code][Clojure CLI Tools]]
+   2. Run `clj -A:dev`
